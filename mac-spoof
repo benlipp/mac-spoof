@@ -1,0 +1,114 @@
+#!/bin/bash
+# Mac MAC Spoof by Ben Lippincott
+# Works on OS X 10.10.1
+
+if [[ $UID != 0 ]]; then
+    echo "Please run this script with sudo:"
+    echo "sudo $0 $*"
+    exit 1
+fi
+
+if [[ $1 == "help" ]] || [[ $1 == '' ]]; then
+	#echo "Help List"
+	echo "help 		Shows this list"
+	echo "install 	Needs to be run when first set-up, should be good otherwise"
+	echo "new 		Changes your mac address to a random one"
+	echo "fixit		Turns your Wi-Fi card off and then on"
+	echo "reset 		This bad boy changes your mac back to its original value"
+	echo "view		Easy way to view your mac address"
+	exit
+fi
+
+if [[ $1 == "new" ]]; then
+	#echo "Setting up new mac address..."
+	#echo
+	#echo
+	ins=$(which airport)
+	if [[ $ins != "/usr/sbin/airport" ]]; then
+		echo "airport utility not symlinked to /usr/sbin/airport!"
+		echo "Try running \"sudo $0 install\" to fix."
+		exit 1
+	fi
+	# we need to see what is the active wifi card. Make sure you disconnect ethernet.
+	en1=$(ifconfig en1 | grep active) # en1 is the default interface for wifi
+	en1=${en1//[[:blank:]]/} # eww, whitespace! Get rid of it!
+
+	# what if there's an error?! OMG!
+	if [[ $en1 != "status:active" ]]; then
+		echo "Some crap is borked somewhere. I give up."
+		#echo "Your wifi should be connected before attempting"
+		exit 1
+	fi
+	# best error handling ever.
+	# get our current mac address
+	current_mac=$(ifconfig en1 | grep ether)
+	current_mac=${current_mac//[[:blank:]]/} # could probably make this remove whitespace thing a function, but bash is weird
+	current_mac=$(echo $current_mac | cut -b 6-)
+	echo "Current mac address is: $current_mac"
+	new_mac=$(openssl rand -hex 1 | sed 's/\(..\)/\1:/g; s/.$//')
+	current_mac=$(echo $current_mac | cut -b 1-15)
+	new_mac=$(echo $current_mac$new_mac)
+	#echo "New mac address is: $new_mac"
+	#echo
+	#echo "Dissociating from AP..."
+	airport -z
+	#echo "Now changing mac address..."
+	ifconfig en1 ether $new_mac
+	#echo
+	#echo "We should be good to go! If you have problems, run \"sudo $0 FIXIT\""
+	#echo "To reset your mac address, either reboot, or run \"sudo $0 reset\""
+	#echo "You can now connect to your AP."
+	echo "New mac address is: $new_mac"
+	exit
+fi
+
+
+if [[ $1 == "view" ]]; then
+	current_mac=$(ifconfig en1 | grep ether)
+	current_mac=${current_mac//[[:blank:]]/} # could probably make this remove whitespace thing a function, but bash is weird
+	current_mac=$(echo $current_mac | cut -b 6-)
+	echo "Current mac address is: $current_mac"
+fi
+
+if [[ $1 == "install" ]]; then
+	#echo Installing...
+	if [[ -s ~/.my_mac_addr ]]; then
+		echo "~/.my_mac_addr already exists! Deleting."
+		rm ~/.my_mac_addr
+	fi
+	#echo "Setting up symlink"
+	ln -s /System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport /usr/sbin/airport
+	current_mac=$(ifconfig en1 | grep ether)
+	current_mac=${current_mac//[[:blank:]]/} # could probably make this remove whitespace thing a function, but bash is weird
+	current_mac=$(echo $current_mac | cut -b 6-)
+	touch ~/.my_mac_addr
+	echo $current_mac > ~/.my_mac_addr
+	#echo
+	#echo "Symlinked airport cli, mac address saved to ~/.my_mac_addr"
+	#echo "You should be good to go."
+	echo "Installed."
+	exit
+fi
+
+if [[ $1 == "fixit" ]]; then
+	echo "Step 1. Fix. Disabling wi-fi adapter..."
+	ifconfig en1 down
+	echo "Step 2. It. Enabling wi-fi adapter..."
+	ifconfig en1 up
+	echo "Step 3. FIX IT! Fix complete."
+	exit
+fi
+
+if [[ $1 == "reset" ]]; then
+	#echo "Resetting mac to default..."
+	#echo
+	#echo
+	original_mac=$(cat ~/.my_mac_addr)
+	#echo "Dropping the association"
+	airport -z
+	#echo "Resetting mac address to $original_mac"
+	ifconfig en0 ether $original_mac
+	#echo
+	echo "Reset complete."
+	exit
+fi
