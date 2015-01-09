@@ -10,4 +10,4 @@ wget:
 
 curl:
 
-    sudo bash <(curl -s https://raw.githubusercontent.com/obiwanakin/mac-spoof/master/install.sh)
+    curl -s https://raw.githubusercontent.com/obiwanakin/mac-spoof/master/install.sh | sudo bash
